@@ -1,0 +1,53 @@
+- hosts: masters
+  become: yes
+  tasks:
+    - name: initialize the cluster
+      shell: kubeadm init --pod-network-cidr 172.15.0.0/16 --kubernetes-version 1.28.5
+      args:
+        chdir: $HOME
+        creates: cluster_initialized.txt
+
+    - name: create .kube directory
+      become: yes
+      become_user: touadmin
+      file:
+        path: $HOME/.kube
+        state: directory
+        mode: 0755
+
+    - name: copies admin.conf to user's kube config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/touadmin/.kube/config
+        remote_src: yes
+        owner: touadmin
+
+    - name: install Pod network
+      become: yes
+      become_user: touadmin
+      shell: kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.25.0/manifests/tigera-operator.yaml
+      args:
+        chdir: $HOME
+
+    - name: get cni custom resources
+      get_url: url=https://raw.githubusercontent.com/projectcalico/calico/v3.25.0/manifests/custom-resources.yaml dest=/tmp/
+
+    - name: update the pod cird in custom resorce file
+      shell: |
+        sed -i 's/192.168.0.0/172.15.0.0/g' /tmp/custom-resources.yaml        
+
+    - name: run the custom resource file for cni
+      become_user: touadmin
+      shell: |
+        kubectl apply -f /tmp/custom-resources.yaml        
+
+    - name: Get the token for joining the worker nodes
+      become: yes
+      become_user: touadmin
+      shell: kubeadm token create  --print-join-command
+      register: kubernetes_join_command
+
+    - name: Copy join command to local file.
+      become: yes
+      become_user: touadmin
+      local_action: copy content="{{ kubernetes_join_command.stdout_lines[0] }}" dest="/tmp/kubernetes_join_command" mode=0777
