@@ -12,12 +12,19 @@ Prerequisites :
 Files :
 
 1 hosts - contains master and worker ips
+
 2 install_k8s.yml - installs kubernetes cluster dependencies
+
 3 master.yml - initiates master node and cni setup
+
 4 worker.yml - worker node joins
+
 5 install_helm.yml - helm installation
+
 6 metallb.yml - metallb installation
+
 7 nginx_ingress.yml - nginx ingress installation
+
 8 template - ip_address_range.yml and advertise.yml files
 
 Playbooks execution :
