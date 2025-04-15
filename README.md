@@ -10,6 +10,7 @@ Prerequisites :
 5 Update k8's master and worker IP's in hosts file
 
 Files :
+
 1 hosts - contains master and worker ips
 2 install_k8s.yml - installs kubernetes cluster dependencies
 3 master.yml - initiates master node and cni setup
