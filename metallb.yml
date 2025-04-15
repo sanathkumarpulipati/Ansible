@@ -1,0 +1,101 @@
+- hosts: 'masters'
+  become: yes
+
+  tasks:
+    - name: install python3-pip
+      apt:
+        name:
+          - python3-pip
+        state: present
+
+    - name: install pre-requisites
+      pip:
+        name:
+        - pyyaml
+        - kubernetes
+
+    - name: get kube-proxy configmap
+      become_user: touadmin
+      shell: kubectl get cm kube-proxy -n kube-system -o yaml > kube-proxy.yml
+
+    - name: update the ipvs strciARP value and mode
+      become_user: touadmin
+      shell: |
+        sed -i 's/strictARP: false/strictARP: true/g' kube-proxy.yml
+        sed -i 's/mode: ""/mode: "ipvs"/g' kube-proxy.yml        
+
+    - name: apply the updated kube-proxy.yml
+      become_user: touadmin
+      shell: kubectl apply -f kube-proxy.yml
+
+    - name: Add metallb helm repo
+      become_user: touadmin
+      kubernetes.core.helm_repository:
+        name: metallb
+        repo_url: https://metallb.github.io/metallb
+
+    - name: update helm repo
+      become_user: touadmin
+      shell: helm repo update
+
+    - name: Create metallb directory
+      become_user: touadmin
+      file:
+        path: $HOME/metallb
+        state: directory
+        mode: 0755
+
+    - name: get metallb values
+      become_user: touadmin
+      shell: helm show values metallb/metallb > $HOME/metallb/metallb-values.yaml
+
+    - name: update values
+      become_user: touadmin
+      shell: |
+        sed -i 's/loadBalancerClass: ""/loadBalancerClass: "metallb"/g' $HOME/metallb/metallb-values.yaml
+        sed -i '0,/name: ""/{s/name: ""/name: "metallb-controller-manager"/g}' $HOME/metallb/metallb-values.yaml
+        sed -i 's/name: ""/name: "metallb-speaker-manager"/g' $HOME/metallb/metallb-values.yaml        
+
+    - name: create metallb namespace
+      become_user: touadmin
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: metallb-system
+            labels:
+              pod-security.kubernetes.io/enforce: privileged
+              pod-security.kubernetes.io/audit: privileged
+              pod-security.kubernetes.io/warn: privileged
+
+    - name: install metallb
+      become_user: touadmin
+      shell: helm install metallb metallb/metallb -n metallb-system -f $HOME/metallb/metallb-values.yaml
+
+    - name: Create metallb1 directory
+      become_user: touadmin
+      file:
+        path: $HOME/metallb1
+        state: directory
+        mode: 0755
+
+    - name: copy ip range yml for metallb
+      become_user: touadmin
+      copy:
+        src: /home/touadmin/ansible/kubernetes/template/ip-address-range.yaml 
+        dest: $HOME/metallb1/
+
+    - name: advertise yml for metallb
+      become_user: touadmin
+      copy:
+        src: /home/touadmin/ansible/kubernetes/template/advertise.yaml 
+        dest: $HOME/metallb1/
+
+    - name: apply the ip range and advertise ymls
+      become_user: touadmin
+      shell: |
+        sleep 200
+        kubectl apply -f $HOME/metallb1/ip-address-range.yaml
+        kubectl apply -f $HOME/metallb1/advertise.yaml        
