@@ -1,0 +1,16 @@
+- hosts: 'masters'
+  become: yes
+
+  tasks:
+    - name: download helm
+      get_url: url=https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 dest=/tmp/get_helm.sh
+
+    - name: Change file ownership, group and permissions
+      file:
+        path: /tmp/get_helm.sh
+        owner: touadmin
+        group: touadmin
+        mode: '0700'
+    
+    - name: execute helm.sh file
+      shell: /tmp/get_helm.sh
