@@ -1,0 +1,5 @@
+[masters]
+master ansible_host=192.168.61.109 ansible_user=touadmin ansible_sudo_pass=Dev@p$123 K8S_AUTH_KUBECONFIG=/home/touadmin/.kube/config
+
+[workers]
+worker1 ansible_host=192.168.61.110 ansible_user=touadmin ansible_sudo_pass=Dev@p$123
