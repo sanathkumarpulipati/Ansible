@@ -1,0 +1,14 @@
+- hosts: "masters, workers"
+  remote_user: touadmin
+  become: yes
+  become_method: sudo
+  become_user: root
+  gather_facts: yes
+  connection: ssh
+
+  tasks:
+
+    - name: update the version in apt source.list.d
+      shell: |
+            sudo sed -i 's/1.28/1.29/g' /etc/apt/sources.list.d/kubernetes.list            
+
