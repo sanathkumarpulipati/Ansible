@@ -1,0 +1,46 @@
+- hosts: 'masters'
+  become: yes
+
+  tasks:
+    - name: Add nginx helm repo
+      become_user: touadmin
+      kubernetes.core.helm_repository:
+        name: nginx
+        repo_url: https://kubernetes.github.io/ingress-nginx
+
+    - name: update helm repo
+      become_user: touadmin
+      shell: helm repo update
+
+    - name: Create nginx directory
+      become_user: touadmin
+      file:
+        path: $HOME/nginx
+        state: directory
+        mode: 0755
+
+    - name: get nginx values
+      become_user: touadmin
+      shell: helm show values nginx/ingress-nginx > $HOME/nginx/nginx-values.yaml
+
+    - name: update values
+      become_user: touadmin
+      shell: |
+        sed -i 's/default: false/default: true/g' $HOME/nginx/nginx-values.yaml
+        sed -i 's/kind: Deployment/kind: DaemonSet/g' $HOME/nginx/nginx-values.yaml
+        sed -i '0,/loadBalancerClass: ""/{s/loadBalancerClass: ""/loadBalancerClass: "metallb"/g}' $HOME/nginx/nginx-values.yaml
+        sed -i '0,/name: ""/{s/name: ""/name: "nginx-ingress-manager"/g}' $HOME/nginx/nginx-values.yaml        
+
+    - name: create nginx-ingress namespace
+      become_user: touadmin
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: nginx-ingress
+
+    - name: install nginx ingress
+      become_user: touadmin
+      shell: helm install nginx-ingress nginx/ingress-nginx -n nginx-ingress -f $HOME/nginx/nginx-values.yaml
