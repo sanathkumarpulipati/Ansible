@@ -1,0 +1,23 @@
+---
+# inventory.yml
+all:
+  hosts:
+    k8s-master:
+      ansible_host: 192.168.1.10
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: ~/.ssh/id_rsa
+    k8s-worker1:
+      ansible_host: 192.168.1.11
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: ~/.ssh/id_rsa
+  children:
+    master:
+      hosts:
+        k8s-master:
+    workers:
+      hosts:
+        k8s-worker1:
+    k8s_cluster:
+      children:
+        master:
+        workers:
