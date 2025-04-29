@@ -1,0 +1,49 @@
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'VM_NAME', defaultValue: 'new-vm-01', description: 'Name of the VM to create')
+        string(name: 'MEMORY_GB', defaultValue: '4', description: 'Memory size in GB')
+        string(name: 'CPU', defaultValue: '2', description: 'Number of CPUs')
+        string(name: 'DISK_SIZE_GB', defaultValue: '50', description: 'Disk size in GB')
+        string(name: 'IP_ADDRESS', defaultValue: '192.168.63.101', description: 'IP address for the VM')
+    }
+
+    environment {
+        ANSIBLE_HOST_KEY_CHECKING = 'False'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', credentialsId: 'gitea_acc', url: 'https://192.168.61.88:3000/Toucan_Payments_India/ansible.git'
+            }
+        }
+
+        stage('Run Ansible') {
+            steps {
+                script {
+                    dir('VM_Automation') {
+                        sh """
+                            ansible-playbook VM_automate.yaml \\
+                                -e vm_name=${params.VM_NAME} \\
+                                -e memory_gb=${params.MEMORY_GB} \\
+                                -e cpu=${params.CPU} \\
+                                -e disk_size_gb=${params.DISK_SIZE_GB} \\
+                                -e ip_address=${params.IP_ADDRESS}
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "VM '${params.VM_NAME}' created successfully."
+        }
+        failure {
+            echo "VM creation failed. Check Ansible logs for details."
+        }
+    }
+}
