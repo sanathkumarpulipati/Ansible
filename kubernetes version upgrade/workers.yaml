@@ -1,0 +1,67 @@
+- hosts: workers
+  become: yes
+  serial: 1  # Ensures tasks run one worker at a time
+  vars_files:
+    - vars.yaml
+
+  tasks:
+    - name: Drain worker node
+      command: kubectl drain {{ inventory_hostname }} --ignore-daemonsets --delete-emptydir-data --kubeconfig {{ kubeconfig_path }}
+      delegate_to: "{{ groups['master'][0] }}"
+
+    - name: Update apt packages on workers
+      apt:
+        update_cache: yes
+
+    - name: Ensure directory for keyring exists on workers
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Kubernetes GPG key on workers
+      get_url:
+        url: "{{ key_url }}"
+        dest: "{{ keyring_path }}"
+        mode: '0644'
+
+    - name: Edit Kubernetes source list
+      blockinfile:
+        path: /etc/apt/sources.list.d/kubernetes.list
+        create: yes
+        block: |
+          deb [signed-by={{ keyring_path }}] {{ k8s_repo_url }} /          
+
+    - name: Unhold kubelet and kubectl
+      shell: "apt-mark unhold {{ item }}"
+      loop:
+        - kubelet
+        - kubectl
+      changed_when: false
+
+    - name: Install kubelet and kubectl {{ k8s_version }}
+      apt:
+        name: "{{ item }}={{ k8s_version }}-*"
+        state: present
+      loop:
+        - kubelet
+        - kubectl
+
+    - name: Hold kubelet and kubectl at {{ k8s_version }}
+      shell: "apt-mark hold {{ item }}"
+      loop:
+        - kubelet
+        - kubectl
+      changed_when: false
+
+    - name: Reload systemd
+      command: systemctl daemon-reload
+
+    - name: Restart kubelet
+      service:
+        name: kubelet
+        state: restarted
+
+    - name: Uncordon worker node
+      command: "kubectl uncordon {{ inventory_hostname }} --kubeconfig {{ kubeconfig_path }}"
+      delegate_to: "{{ groups['master'][0] }}"
