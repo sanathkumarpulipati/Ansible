@@ -1,0 +1,107 @@
+- hosts: master
+  become: yes
+  vars_files:
+    - vars.yaml
+
+  tasks:
+    - name: Update Kubernetes apt keyring on master
+      block:
+        - name: Remove old Kubernetes apt keyring
+          file:
+            path: "{{ keyring_path }}"
+            state: absent
+
+        - name: Download and add new Kubernetes apt keyring
+          shell: |
+            curl -fsSL {{ key_url }} -o /tmp/kubernetes-apt-key.gpg
+            sudo gpg --dearmor -o {{ keyring_path }} /tmp/kubernetes-apt-key.gpg            
+          args:
+            creates: "{{ keyring_path }}"
+
+    - name: Update apt packages on master
+      apt:
+        update_cache: yes
+
+    - name: Ensure directory for keyring exists
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Kubernetes GPG key
+      get_url:
+        url: "{{ key_url }}"
+        dest: "{{ keyring_path }}"
+        mode: '0644'
+
+    - name: Edit Kubernetes source list
+      blockinfile:
+        path: /etc/apt/sources.list.d/kubernetes.list
+        create: yes
+        block: |
+          deb [signed-by={{ keyring_path }}] {{ k8s_repo_url }} /          
+
+    - name: Unhold kubeadm
+      shell: "apt-mark unhold kubeadm"
+      changed_when: false
+
+    - name: Install kubeadm {{ k8s_version }}
+      apt:
+        name: kubeadm={{ k8s_version }}-*
+        state: present
+
+    - name: Hold kubeadm at version {{ k8s_version }}
+      shell: "apt-mark hold kubeadm"
+      changed_when: false
+
+    - name: Upgrade Kubernetes control plane
+      shell: "kubeadm upgrade apply v{{ k8s_version }} --yes --kubeconfig {{ kubeconfig_path }}"
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+
+    - name: Unhold kubelet and kubectl
+      shell: "apt-mark unhold {{ item }}"
+      loop:
+        - kubelet
+        - kubectl
+      changed_when: false
+
+    - name: Install kubelet and kubectl {{ k8s_version }}
+      apt:
+        name: "{{ item }}={{ k8s_version }}-*"
+        state: present
+      loop:
+        - kubelet
+        - kubectl
+
+    - name: Hold kubelet and kubectl at {{ k8s_version }}
+      shell: "apt-mark hold {{ item }}"
+      loop:
+        - kubelet
+        - kubectl
+      changed_when: false
+
+    - name: Reload systemd
+      command: systemctl daemon-reload
+
+    - name: Restart kubelet
+      service:
+        name: kubelet
+        state: restarted
+
+    - name: Ensure the .kube directory exists
+      file:
+        path: /home/touadmin/.kube
+        state: directory
+        owner: touadmin
+        group: touadmin
+        mode: '0755'
+
+    - name: Copy admin.conf to the user's kube config directory
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/touadmin/.kube/config
+        owner: touadmin
+        group: touadmin
+        mode: '0644'
+        remote_src: yes
