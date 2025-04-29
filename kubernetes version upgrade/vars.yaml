@@ -1,0 +1,6 @@
+# vars.yaml
+k8s_version: "1.30.0"
+k8s_repo_url: "https://pkgs.k8s.io/core:/stable:/v1.30/deb/"
+keyring_path: "/etc/apt/keyrings/kubernetes-apt-keyring.gpg"
+key_url: "https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key"
+kubeconfig_path: "/etc/kubernetes/admin.conf"
