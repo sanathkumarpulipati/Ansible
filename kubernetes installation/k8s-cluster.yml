@@ -1,0 +1,22 @@
+---
+# k8s-cluster.yml
+- name: Setup Kubernetes Cluster
+  hosts: all
+  become: true
+  tasks:
+    - name: Include common tasks
+      ansible.builtin.import_tasks: common.yml
+
+- name: Setup Kubernetes Master
+  hosts: master
+  become: true
+  tasks:
+    - name: Include master tasks
+      ansible.builtin.import_tasks: master.yml
+
+- name: Setup Kubernetes Workers
+  hosts: workers
+  become: true
+  tasks:
+    - name: Include worker tasks
+      ansible.builtin.import_tasks: worker.yml
