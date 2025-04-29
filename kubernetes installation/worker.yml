@@ -1,0 +1,46 @@
+---
+# worker.yml
+- name: Copy join command from local file
+  copy:
+    src: ./join_command.sh
+    dest: /tmp/join_command.sh
+    mode: '0777'
+
+- name: Join worker nodes to the cluster
+  shell: sh /tmp/join_command.sh
+  register: join_result
+  args:
+    creates: /etc/kubernetes/kubelet.conf
+
+- name: Remove join command file
+  file:
+    path: /tmp/join_command.sh
+    state: absent
+
+# To use this Ansible setup:
+
+# First, modify the IP addresses in the inventory.yml to match your actual server addresses.
+# Ensure you have SSH access to both servers and that the SSH key specified in the inventory is correct.
+# Install Ansible on your control machine if you haven't already:
+# bashsudo apt update
+# sudo apt install ansible
+
+# Create all the necessary files in a directory:
+# bashmkdir k8s-ansible
+# cd k8s-ansible
+# # Create all the files shown above
+
+# Execute the playbook:
+# bashansible-playbook -i inventory.yml k8s-cluster.yml
+
+
+# This setup:
+
+# Uses Kubernetes 1.29
+# Configures containerd as the container runtime
+# Deploys Flannel as the CNI network plugin
+# Automatically joins the worker node to the master
+
+# After running the playbook, you can verify your cluster by SSH'ing into the master node and running:
+# bashkubectl get nodes
+# Both nodes should show up in the list and transition to "Ready" status within a few minutes.
